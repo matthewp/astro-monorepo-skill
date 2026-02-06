@@ -126,6 +126,107 @@ When creating a pull request, use the template at `.github/PULL_REQUEST_TEMPLATE
 
 Don't forget to run `pnpm exec changeset` before submitting!
 
+## Working with GitHub Issues
+
+### Identifying URL Types
+
+**Regular issue URL:**
+
+```
+https://github.com/withastro/astro/issues/14481
+                                       ^^^^^^
+                                       Issue number
+```
+
+**Project board item URL:**
+
+```
+https://github.com/orgs/withastro/projects/21/views/1?pane=issue&itemId=154871753
+                   ^^^^           ^^^^^^^^                       ^^^^^^^^^^^^^^^^
+                   "orgs"         Project #                      Project item ID (NOT an issue number)
+```
+
+Key differences:
+
+- Regular issues: `/repos/` or `/{owner}/{repo}/issues/{number}`
+- Project items: `/orgs/{org}/projects/{number}` with `itemId` query param
+- Project items can be **draft issues** (no linked repo issue), **linked issues**, or **pull requests**
+
+### Fetching Regular Issues
+
+Use `gh issue view` for regular repository issues:
+
+```shell
+# Fetch a specific issue by number
+gh issue view 14481 --repo withastro/astro
+
+# Fetch with full body content in JSON format
+gh issue view 14481 --repo withastro/astro --json title,body,url,labels,state
+
+# List recent issues
+gh issue list --repo withastro/astro --limit 20
+```
+
+### Fetching Project Board Items
+
+Project board URLs require GraphQL. The `itemId` in the URL is a project-specific database ID, not an issue number.
+
+```shell
+# Fetch a specific project item by its itemId (e.g., 154871753)
+gh api graphql -f query='
+query {
+  organization(login: "withastro") {
+    projectV2(number: 21) {
+      items(first: 100) {
+        nodes {
+          databaseId
+          type
+          fieldValues(first: 20) {
+            nodes {
+              ... on ProjectV2ItemFieldTextValue {
+                text
+                field { ... on ProjectV2FieldCommon { name } }
+              }
+              ... on ProjectV2ItemFieldSingleSelectValue {
+                name
+                field { ... on ProjectV2FieldCommon { name } }
+              }
+            }
+          }
+          content {
+            ... on Issue {
+              title
+              body
+              url
+              number
+            }
+            ... on DraftIssue {
+              title
+              body
+            }
+          }
+        }
+      }
+    }
+  }
+}' | jq '.data.organization.projectV2.items.nodes[] | select(.databaseId == 154871753)'
+```
+
+**Important:** Project items with `"type": "DRAFT_ISSUE"` have no linked repository issue - their content is only in the `DraftIssue` fragment. Items with `"type": "ISSUE"` are linked to real repo issues.
+
+### Common Issue Queries
+
+```shell
+# Search for issues by label
+gh issue list --repo withastro/astro --label "bug" --limit 20
+
+# Search issues by text
+gh issue list --repo withastro/astro --search "cloudflare adapter"
+
+# Get issue comments
+gh api repos/withastro/astro/issues/14481/comments
+```
+
 ## Downloading StackBlitz Reproductions
 
 Bug reports often include StackBlitz reproductions. Use `stackblitz-clone` to download them:

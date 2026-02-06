@@ -102,6 +102,10 @@ The codebase has three distinct runtime contexts:
 
 ## Contribution Workflow
 
+### Git
+
+Do not stage or commit changes unless explicitly asked to.
+
 ### Changesets
 
 Required for any package changes (not needed for `examples/*`):
